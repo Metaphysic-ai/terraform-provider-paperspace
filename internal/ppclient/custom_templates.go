@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"terraform-provider-paperspace/internal/ppclient/models"
 )
 
-func (c *Client) GetCustomTemplates() ([]models.CustomTemplate, error) {
-	var allItems []models.CustomTemplate
+func (c *Client) GetCustomTemplates() ([]CustomTemplate, error) {
+	var allItems []CustomTemplate
 	reqLimit := 120 // 1..120
 	nextPage := ""
 	hasMore := true
@@ -33,7 +31,7 @@ func (c *Client) GetCustomTemplates() ([]models.CustomTemplate, error) {
 		}
 
 		// Unmarshal the response into the struct
-		res := &models.CustomTemplatesResponse{}
+		res := &CustomTemplatesResponse{}
 		err = json.Unmarshal(body, res)
 		if err != nil {
 			return nil, err
@@ -43,6 +41,16 @@ func (c *Client) GetCustomTemplates() ([]models.CustomTemplate, error) {
 
 		nextPage = res.NextPage
 		hasMore = res.HasMore
+	}
+
+	// API returns duplicates. Workaround: get only unique items based on ID
+	uniqueItems := make(map[string]CustomTemplate)
+	for _, item := range allItems {
+		uniqueItems[item.ID] = item
+	}
+	allItems = []CustomTemplate{}
+	for _, item := range uniqueItems {
+		allItems = append(allItems, item)
 	}
 
 	return allItems, nil

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure paperspaceProvider satisfies various provider interfaces.
@@ -51,6 +52,8 @@ func (p *paperspaceProvider) Schema(ctx context.Context, req provider.SchemaRequ
 func (p *paperspaceProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	// Retrieve provider data from configuration
 
+	tflog.Info(ctx, "Configuring Paperspace client")
+
 	var config paperspaceProviderModel
 
 	diags := req.Config.Get(ctx, &config)
@@ -66,9 +69,9 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 	if config.APIKey.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("api_key"),
-			"Unknown Paperspace API Password",
-			"The provider cannot create the Paperspace API client as there is an unknown configuration value for the Paperspace API password. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the PAPERSPACE_PASSWORD environment variable.",
+			"Unknown Paperspace API Key",
+			"The provider cannot create the Paperspace API client as there is an unknown configuration value for the Paperspace API Key. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the PAPERSPACE_API_KEY environment variable.",
 		)
 	}
 
@@ -79,7 +82,7 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
 
-	api_key := os.Getenv("PAPERSPACE_PASSWORD")
+	api_key := os.Getenv("PAPERSPACE_API_KEY")
 
 	if !config.APIKey.IsNull() {
 		api_key = config.APIKey.ValueString()
@@ -90,10 +93,10 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 
 	if api_key == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("password"),
-			"Missing Paperspace API Password",
-			"The provider cannot create the Paperspace API client as there is a missing or empty value for the Paperspace API password. "+
-				"Set the password value in the configuration or use the PAPERSPACE_PASSWORD environment variable. "+
+			path.Root("api_key"),
+			"Missing Paperspace API Key",
+			"The provider cannot create the Paperspace API client as there is a missing or empty value for the Paperspace API Key. "+
+				"Set the api key value in the configuration or use the PAPERSPACE_API_KEY environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -102,8 +105,9 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 		return
 	}
 
-	// Create a new Paperspace client using the configuration values
-	// client := http.DefaultClient
+	// TFlog Masking secrets example: https://pkg.go.dev/github.com/hashicorp/terraform-plugin-log@v0.9.0/tflog#MaskFieldValuesWithFieldKeys
+
+	tflog.Info(ctx, "Creating Paperspace client")
 
 	// Create a new Paperspace client using the configuration values
 	client, err := ppclient.NewClient(nil, &api_key)
@@ -120,10 +124,15 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 	// Make the Paperspace client available during DataSource and Resource type Configure methods.
 	resp.DataSourceData = client
 	resp.ResourceData = client
+
+	tflog.Info(ctx, "Configured Paperspace client", map[string]any{"success": true})
 }
 
+// Add resources to provider
 func (p *paperspaceProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		NewMachineResource,
+	}
 }
 
 func (p *paperspaceProvider) DataSources(ctx context.Context) []func() datasource.DataSource {

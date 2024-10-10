@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"terraform-provider-paperspace/internal/ppclient/models"
 )
 
 const HostURL string = "https://api.paperspace.com/v1"
@@ -17,10 +15,10 @@ type Client struct {
 	HostURL     string
 	HTTPClient  *http.Client
 	Token       string
-	AuthSession *models.AuthSession
+	AuthSession *AuthSession
 }
 
-func (c *Client) GetAuthSession() (*models.AuthSession, error) {
+func (c *Client) GetAuthSession() (*AuthSession, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/auth/session", c.HostURL), nil)
 	if err != nil {
 		return nil, err
@@ -31,7 +29,7 @@ func (c *Client) GetAuthSession() (*models.AuthSession, error) {
 		return nil, err
 	}
 
-	authSession := &models.AuthSession{}
+	authSession := &AuthSession{}
 	err = json.Unmarshal(body, authSession)
 
 	if err != nil {
@@ -47,7 +45,7 @@ func (c *Client) GetAuthSession() (*models.AuthSession, error) {
 
 func NewClient(host, authToken *string) (*Client, error) {
 	c := Client{
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 		HostURL:    HostURL,
 	}
 
@@ -74,6 +72,7 @@ func NewClient(host, authToken *string) (*Client, error) {
 
 func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {

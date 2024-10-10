@@ -50,3 +50,13 @@ In order to run the full suite of Acceptance tests, run `make testacc`.
 ```shell
 make testacc
 ```
+
+### Useful links
+
+- https://developer.hashicorp.com/terraform/plugin/framework
+- https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-resource-create
+- https://github.com/Paperspace/terraform-provider-paperspace/blob/master/pkg/provider/resource_machine.go
+- https://spacelift.io/blog/terraform-custom-provider
+- https://docs.digitalocean.com/reference/paperspace/pspace/api-reference/
+- https://docs.digitalocean.com/products/paperspace/
+- https://docs.digitalocean.com/products/paperspace/machines/getting-started/create-machine-with-api/
