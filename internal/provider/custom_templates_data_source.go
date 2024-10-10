@@ -32,6 +32,34 @@ func (d *customTemplatesDataSource) Metadata(_ context.Context, req datasource.M
 	resp.TypeName = req.ProviderTypeName + "_custom_templates"
 }
 
+//// Data model types
+
+// coffeesIngredientsModel maps coffee ingredients data
+type availableMachineTypeModel struct {
+	MachineTypeLabel types.String `tfsdk:"machine_type_label"`
+	IsAvailable      types.Bool   `tfsdk:"is_available"`
+}
+
+// customTemplatesModel maps customTemplates schema data.
+type customTemplatesModel struct {
+	ID                   types.String                `tfsdk:"id"`
+	Name                 types.String                `tfsdk:"name"`
+	AgentType            types.String                `tfsdk:"agent_type"`
+	OperatingSystemLabel types.String                `tfsdk:"operating_system_label"`
+	Region               types.String                `tfsdk:"region"`
+	DefaultSizeGb        types.Int32                 `tfsdk:"default_size_gb"`
+	AvailableMachineType []availableMachineTypeModel `tfsdk:"available_machine_type"`
+	ParentMachineID      types.String                `tfsdk:"parent_machine_id"`
+	DtCreated            types.String                `tfsdk:"dt_created"`
+}
+
+// customTemplatesDataSourceModel maps the data source schema data.
+type customTemplatesDataSourceModel struct {
+	CustomTemplates []customTemplatesModel `tfsdk:"custom_templates"`
+}
+
+//// Schema
+
 // Schema defines the schema for the data source.
 // The data source uses the Schema method to define the acceptable configuration and state attribute names and types.
 func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -64,12 +92,15 @@ func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.Schem
 						"default_size_gb": schema.Int32Attribute{
 							Computed: true,
 						},
-
-						// TODO: Add nested attributes available_machine_types
-						// Example:
-						// https://github.com/hashicorp/terraform-provider-hashicups/blob/main/03-read-coffees/internal/provider/coffees_data_source.go
-						// "available_machine_types":
-
+						"available_machine_type": schema.ListNestedAttribute{
+							Computed: true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"machine_type_label": schema.StringAttribute{Computed: true},
+									"is_available":       schema.BoolAttribute{Computed: true},
+								},
+							},
+						},
 						"parent_machine_id": schema.StringAttribute{
 							Computed: true,
 						},
@@ -81,27 +112,6 @@ func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.Schem
 			},
 		},
 	}
-}
-
-//
-// Data model types
-//
-
-// customTemplatesDataSourceModel maps the data source schema data.
-type customTemplatesDataSourceModel struct {
-	CustomTemplates []customTemplatesModel `tfsdk:"custom_templates"`
-}
-
-// customTemplatesModel maps customTemplates schema data.
-type customTemplatesModel struct {
-	ID                   types.String `tfsdk:"id"`
-	Name                 types.String `tfsdk:"name"`
-	AgentType            types.String `tfsdk:"agent_type"`
-	OperatingSystemLabel types.String `tfsdk:"operating_system_label"`
-	Region               types.String `tfsdk:"region"`
-	DefaultSizeGb        types.Int32  `tfsdk:"default_size_gb"`
-	ParentMachineID      types.String `tfsdk:"parent_machine_id"`
-	DtCreated            types.String `tfsdk:"dt_created"`
 }
 
 // TODO: Sort results
@@ -127,9 +137,16 @@ func (d *customTemplatesDataSource) Read(ctx context.Context, req datasource.Rea
 			AgentType:            types.StringValue(customTemplate.AgentType),
 			OperatingSystemLabel: types.StringValue(customTemplate.OperatingSystemLabel),
 			Region:               types.StringValue(customTemplate.Region),
-			DefaultSizeGb:        types.Int32Value(int32(customTemplate.DefaultSizeGb)), // TODO: Consider allowing positive values only
+			DefaultSizeGb:        types.Int32Value(int32(customTemplate.DefaultSizeGb)),
 			ParentMachineID:      types.StringValue(customTemplate.ParentMachineID),
 			DtCreated:            types.StringValue(customTemplate.DtCreated),
+		}
+
+		for _, item := range customTemplate.AvailableMachineTypes {
+			customTemplateState.AvailableMachineType = append(customTemplateState.AvailableMachineType, availableMachineTypeModel{
+				MachineTypeLabel: types.StringValue(item.MachineTypeLabel),
+				IsAvailable:      types.BoolValue(item.IsAvailable),
+			})
 		}
 
 		state.CustomTemplates = append(state.CustomTemplates, customTemplateState)
