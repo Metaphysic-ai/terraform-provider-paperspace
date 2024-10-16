@@ -17,9 +17,3 @@ type CustomTemplate struct {
 	DtCreated             string                 `json:"dtCreated"`
 	DtDeleted             *string                `json:"dtDeleted"` // Nullable
 }
-
-type CustomTemplatesResponse struct {
-	HasMore  bool             `json:"hasMore"`
-	NextPage string           `json:"nextPage"`
-	Items    []CustomTemplate `json:"items"`
-}

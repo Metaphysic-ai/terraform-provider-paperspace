@@ -65,7 +65,6 @@ type customTemplatesDataSourceModel struct {
 func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			// TODO: Consider removing custom_templates key on top level
 			"custom_templates": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
