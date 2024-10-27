@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Returns number of each found machine event type (name)
@@ -28,11 +30,14 @@ func (c *Client) GetMachineEventsStateStat() (error, map[string]int) {
 }
 
 func (c *Client) waitForEvent(eventID string) (*Event, error) {
-	// TODO: Add some timeout
 	url := fmt.Sprintf("%s/machine-events/%s", c.HostURL, eventID)
 
 	var event Event
 	pollInterval := 5 * time.Second
+	timeout := 30 * time.Minute
+
+	// Create a timer for the timeout
+	timer := time.After(timeout)
 
 	// Poll with interval until event is done or error occurs
 	for {
@@ -62,11 +67,15 @@ func (c *Client) waitForEvent(eventID string) (*Event, error) {
 
 		// There is a case, when {"state": "error", "error": null}
 		if event.State == "error" {
-			return nil, fmt.Errorf("Unknown error during event %s processing", eventID)
+			return nil, fmt.Errorf("unknown error during event %s processing", eventID)
 		}
 
-		// Wait before polling again
-		time.Sleep(pollInterval)
+		// Wait for either the polling interval or the timeout
+		select {
+		case <-time.After(pollInterval):
+		case <-timer:
+			return nil, fmt.Errorf("timeout reached while waiting for event %s", eventID)
+		}
 	}
 }
 
@@ -85,6 +94,8 @@ func (c *Client) waitForMachineEvents(machineID string) error {
 		if event.State == "done" {
 			continue
 		}
+
+		tflog.Info(*c.Context, fmt.Sprintf("Waiting for machine event '%s' to complete, event id: %s", event.Name, event.ID))
 
 		_, err := c.waitForEvent(event.ID)
 		if err != nil {

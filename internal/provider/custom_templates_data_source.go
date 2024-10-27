@@ -47,7 +47,7 @@ type customTemplatesModel struct {
 	AgentType            types.String                `tfsdk:"agent_type"`
 	OperatingSystemLabel types.String                `tfsdk:"operating_system_label"`
 	Region               types.String                `tfsdk:"region"`
-	DefaultSizeGb        types.Int32                 `tfsdk:"default_size_gb"`
+	DefaultSizeGb        types.Int64                 `tfsdk:"default_size_gb"`
 	AvailableMachineType []availableMachineTypeModel `tfsdk:"available_machine_type"`
 	ParentMachineID      types.String                `tfsdk:"parent_machine_id"`
 	DtCreated            types.String                `tfsdk:"dt_created"`
@@ -70,29 +70,32 @@ func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.Schem
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed: true,
-							// Sensitive: false,
-
-							// TODO: Add descriptions
-							// Example: MarkdownDescription: "Example identifier",
+							MarkdownDescription: "Template ID.",
+							Computed:            true,
 						},
 						"name": schema.StringAttribute{
-							Computed: true,
+							MarkdownDescription: "Template name.",
+							Computed:            true,
 						},
 						"agent_type": schema.StringAttribute{
-							Computed: true,
+							MarkdownDescription: "Template agent type.",
+							Computed:            true,
 						},
 						"operating_system_label": schema.StringAttribute{
-							Computed: true,
+							MarkdownDescription: "Template operating system label.",
+							Computed:            true,
 						},
 						"region": schema.StringAttribute{
-							Computed: true,
+							MarkdownDescription: "Template region.",
+							Computed:            true,
 						},
-						"default_size_gb": schema.Int32Attribute{
-							Computed: true,
+						"default_size_gb": schema.Int64Attribute{
+							MarkdownDescription: "Default disk size in GB.",
+							Computed:            true,
 						},
 						"available_machine_type": schema.ListNestedAttribute{
-							Computed: true,
+							MarkdownDescription: "Available machine types.",
+							Computed:            true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"machine_type_label": schema.StringAttribute{Computed: true},
@@ -101,10 +104,12 @@ func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.Schem
 							},
 						},
 						"parent_machine_id": schema.StringAttribute{
-							Computed: true,
+							MarkdownDescription: "Template parent machine ID.",
+							Computed:            true,
 						},
 						"dt_created": schema.StringAttribute{
-							Computed: true,
+							MarkdownDescription: "Template created date timestamp.",
+							Computed:            true,
 						},
 					},
 				},
@@ -112,8 +117,6 @@ func (d *customTemplatesDataSource) Schema(_ context.Context, _ datasource.Schem
 		},
 	}
 }
-
-// TODO: Sort results
 
 // Read refreshes the Terraform state with the latest data.
 func (d *customTemplatesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -129,14 +132,14 @@ func (d *customTemplatesDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	// Map response body to model
-	for _, customTemplate := range customTemplates {
+	for _, customTemplate := range *customTemplates {
 		customTemplateState := customTemplatesModel{
 			ID:                   types.StringValue(customTemplate.ID),
 			Name:                 types.StringValue(customTemplate.Name),
 			AgentType:            types.StringValue(customTemplate.AgentType),
 			OperatingSystemLabel: types.StringValue(customTemplate.OperatingSystemLabel),
 			Region:               types.StringValue(customTemplate.Region),
-			DefaultSizeGb:        types.Int32Value(int32(customTemplate.DefaultSizeGb)),
+			DefaultSizeGb:        types.Int64Value(int64(customTemplate.DefaultSizeGb)),
 			ParentMachineID:      types.StringValue(customTemplate.ParentMachineID),
 			DtCreated:            types.StringValue(customTemplate.DtCreated),
 		}

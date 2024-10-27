@@ -1,6 +1,7 @@
 package ppclient
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ type Client struct {
 	HTTPClient  *http.Client
 	Token       string
 	AuthSession *AuthSession
+	Context     *context.Context
 }
 
 func (c *Client) GetAuthSession() (*AuthSession, error) {
@@ -43,10 +45,11 @@ func (c *Client) GetAuthSession() (*AuthSession, error) {
 	return authSession, nil
 }
 
-func NewClient(host, authToken *string) (*Client, error) {
+func NewClient(host, authToken *string, ctx context.Context) (*Client, error) {
 	c := Client{
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 		HostURL:    HostURL,
+		Context:    &ctx,
 	}
 
 	// If authToken not provided, return empty client

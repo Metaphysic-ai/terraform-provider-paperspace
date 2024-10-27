@@ -38,7 +38,7 @@ type User struct {
 type TeamInfo struct {
 	Namespace   string `json:"namespace"`
 	IsPrivate   bool   `json:"isPrivate"`
-	MaxMachines int    `json:"maxMachines"`
+	MaxMachines int64  `json:"maxMachines"`
 	ID          string `json:"id"`
 }
 

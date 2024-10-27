@@ -6,7 +6,7 @@ import "time"
 type Accelerator struct {
 	Name   string `json:"name"`
 	Memory string `json:"memory"`
-	Count  int    `json:"count"`
+	Count  int64  `json:"count"`
 }
 
 // Reservation represents the structure for machine reservation details.
@@ -26,71 +26,70 @@ type Machine struct {
 	OS                     string        `json:"os"`
 	MachineType            string        `json:"machineType"`
 	AgentType              string        `json:"agentType"`
-	CPUs                   int           `json:"cpus"`
+	CPUs                   int64         `json:"cpus"`
 	RAM                    string        `json:"ram"`
 	StorageTotal           string        `json:"storageTotal"`
 	StorageUsed            string        `json:"storageUsed"`
 	Accelerators           []Accelerator `json:"accelerators"`
-	Region                 string        `json:"region"`
+	RegionFull             string        `json:"region"`
 	PrivateIP              string        `json:"privateIp"`
 	NetworkID              string        `json:"networkId"`
 	PublicIP               *string       `json:"publicIp"` // Nullable field
 	PublicIPType           string        `json:"publicIpType"`
 	AutoShutdownEnabled    bool          `json:"autoShutdownEnabled"`
-	AutoShutdownTimeout    *int          `json:"autoShutdownTimeout"` // Nullable field
+	AutoShutdownTimeout    *int64        `json:"autoShutdownTimeout"` // Nullable field
 	AutoShutdownForce      bool          `json:"autoShutdownForce"`
 	AutoSnapshotEnabled    bool          `json:"autoSnapshotEnabled"`
 	AutoSnapshotFrequency  *string       `json:"autoSnapshotFrequency"` // Nullable field
-	AutoSnapshotSaveCount  *int          `json:"autoSnapshotSaveCount"` // Nullable field
+	AutoSnapshotSaveCount  *int64        `json:"autoSnapshotSaveCount"` // Nullable field
 	UpdatesPending         bool          `json:"updatesPending"`
 	RestorePointEnabled    bool          `json:"restorePointEnabled"`
 	RestorePointFrequency  *string       `json:"restorePointFrequency"`  // Nullable field
 	RestorePointSnapshotID *string       `json:"restorePointSnapshotId"` // Nullable field
 	UsageRate              float64       `json:"usageRate"`
 	StorageRate            float64       `json:"storageRate"`
-	DtCreated              time.Time     `json:"dtCreated"`
-	DtModified             time.Time     `json:"dtModified"`
-	DtDeleted              *time.Time    `json:"dtDeleted"`   // Nullable field
+	DtCreated              string        `json:"dtCreated"`
+	DtModified             string        `json:"dtModified"`
+	DtDeleted              *string       `json:"dtDeleted"`   // Nullable field
 	Reservation            *Reservation  `json:"reservation"` // Nullable field
 }
 
-type MashinesResponse struct {
-	HasMore  bool      `json:"hasMore"`
-	NextPage string    `json:"nextPage"`
-	Items    []Machine `json:"items"`
+type MachineCreateConfig struct {
+	Name                  string `json:"name"`        // required
+	MachineType           string `json:"machineType"` // required
+	TemplateID            string `json:"templateId"`  // required
+	DiskSize              int64  `json:"diskSize"`    // required
+	Region                string `json:"region"`      // required
+	NetworkID             string `json:"networkId,omitempty"`
+	PublicIPType          string `json:"publicIpType,omitempty"`
+	StartOnCreate         *bool  `json:"startOnCreate,omitempty"`
+	AutoSnapshotEnabled   *bool  `json:"autoSnapshotEnabled,omitempty"`
+	AutoSnapshotFrequency string `json:"autoSnapshotFrequency,omitempty"`
+	AutoSnapshotSaveCount *int64 `json:"autoSnapshotSaveCount,omitempty"`
+	AutoShutdownEnabled   *bool  `json:"autoShutdownEnabled,omitempty"`
+	AutoShutdownTimeout   *int64 `json:"autoShutdownTimeout,omitempty"`
+	AutoShutdownForce     *bool  `json:"autoShutdownForce,omitempty"`
+	EnableNvlink          *bool  `json:"enableNvlink,omitempty"`
+	TakeInitialSnapshot   *bool  `json:"takeInitialSnapshot,omitempty"`
+	StartupScriptID       string `json:"startupScriptId,omitempty"`
+	EmailPassword         *bool  `json:"emailPassword,omitempty"`
+
+	// TODO: Consider pointer+omit here
+	AccessorIDs []string `json:"accessorIds,omitempty"`
 }
 
-// Configuration of machine to be created
-type MachineConfig struct {
-	Name          string `json:"name"`        // required
-	MachineType   string `json:"machineType"` // required
-	TemplateID    string `json:"templateId"`  // required
-	DiskSize      int    `json:"diskSize"`    // required
-	Region        string `json:"region"`      // required
-	NetworkID     string `json:"networkId"`
-	PublicIpType  string `json:"publicIpType"`
-	StartOnCreate bool   `json:"startOnCreate"`
-
-	// TODO: Add remaining attributes
-
-	// AutoSnapshotEnabled bool   `json:"autoSnapshotEnabled"`
-	// AutoSnapshotFrequency string `json:"autoSnapshotFrequency"`
-	// AutoSnapshotSaveCount int  `json:"autoSnapshotSaveCount"`
-
-	// AutoShutdownEnabled   bool `json:"autoShutdownEnabled"`
-	// AutoShutdownTimeout   int  `json:"autoShutdownTimeout"`
-	// AutoShutdownForce     bool `json:"autoShutdownForce"`
-
-	// RestorePointEnabled   bool `json:"restorePointEnabled"`
-	// RestorePointFrequency string `json:"restorePointFrequency"`
-
-	// EnableNvlink    bool   `json:"enableNvlink"`
-	// TakeInitialSnapshot   bool `json:"takeInitialSnapshot"`
-
-	// // Useful
-	// StartupScriptID string   `json:"startupScriptId"`
-	// EmailPassword   bool     `json:"emailPassword"` # default: true
-	AccessorIds []string `json:"accessorIds"`
+type MachineUpdateConfig struct {
+	Name                  string `json:"name,omitempty"`
+	MachineType           string `json:"machineType,omitempty"`
+	DiskSize              int64  `json:"diskSize,omitempty"`
+	NetworkID             string `json:"networkId,omitempty"`
+	PublicIPType          string `json:"publicIpType,omitempty"`
+	AutoSnapshotEnabled   *bool  `json:"autoSnapshotEnabled,omitempty"`
+	AutoSnapshotFrequency string `json:"autoSnapshotFrequency,omitempty"`
+	AutoSnapshotSaveCount *int64 `json:"autoSnapshotSaveCount,omitempty"`
+	AutoShutdownEnabled   *bool  `json:"autoShutdownEnabled,omitempty"`
+	AutoShutdownTimeout   *int64 `json:"autoShutdownTimeout,omitempty"`
+	AutoShutdownForce     *bool  `json:"autoShutdownForce,omitempty"`
 }
 
 type Event struct {

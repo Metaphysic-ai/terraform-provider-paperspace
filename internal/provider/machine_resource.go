@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"terraform-provider-paperspace/internal/ppclient"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -28,43 +32,54 @@ func NewMachineResource() resource.Resource {
 	return &machineResource{}
 }
 
-// machineResourceModel maps the resource schema data.
+// Maps the resource schema data.
 // State/Plan structure
 type machineResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`         // Required
-	MachineType types.String `tfsdk:"machine_type"` // Required
-	TemplateID  types.String `tfsdk:"template_id"`  // Required
-	DiskSize    types.Int32  `tfsdk:"disk_size"`    // Required
-	Region      types.String `tfsdk:"region"`       // Required
+	// MachineCreateConfig
+	Name                   types.String `tfsdk:"name"`         // required
+	MachineType            types.String `tfsdk:"machine_type"` // required
+	TemplateID             types.String `tfsdk:"template_id"`  // required
+	DiskSize               types.Int64  `tfsdk:"disk_size"`    // required
+	Region                 types.String `tfsdk:"region"`       // required
+	NetworkID              types.String `tfsdk:"network_id"`
+	AutoSnapshotEnabled    types.Bool   `tfsdk:"auto_snapshot_enabled"`
+	AutoSnapshotFrequency  types.String `tfsdk:"auto_snapshot_frequency"`
+	AutoSnapshotSaveCount  types.Int64  `tfsdk:"auto_snapshot_save_count"`
+	AutoShutdownEnabled    types.Bool   `tfsdk:"auto_shutdown_enabled"`
+	AutoShutdownTimeout    types.Int64  `tfsdk:"auto_shutdown_timeout"`
+	AutoShutdownForce      types.Bool   `tfsdk:"auto_shutdown_force"`
+	RestorePointEnabled    types.Bool   `tfsdk:"restore_point_enabled"`
+	RestorePointFrequency  types.String `tfsdk:"restore_point_frequency"`
+	RestorePointSnapshotID types.String `tfsdk:"restore_point_snapshot_id"`
+	PublicIPType           types.String `tfsdk:"public_ip_type"`
+	StartOnCreate          types.Bool   `tfsdk:"start_on_create"`
+	EnableNvlink           types.Bool   `tfsdk:"enable_nvlink"`
+	TakeInitialSnapshot    types.Bool   `tfsdk:"take_initial_snapshot"`
+	StartupScriptID        types.String `tfsdk:"startup_script_id"`
+	EmailPassword          types.Bool   `tfsdk:"email_password"`
+	AccessorIDs            types.List   `tfsdk:"accessor_ids"`
 
-	NetworkID types.String `tfsdk:"network_id"`
+	// Computed only
+	ID           types.String  `tfsdk:"id"`
+	RegionFull   types.String  `tfsdk:"region_full"`
+	CPUs         types.Int64   `tfsdk:"cpus"`
+	State        types.String  `tfsdk:"state"`
+	OS           types.String  `tfsdk:"os"`
+	AgentType    types.String  `tfsdk:"agent_type"`
+	PublicIP     types.String  `tfsdk:"public_ip"`
+	PrivateIP    types.String  `tfsdk:"private_ip"`
+	RAM          types.String  `tfsdk:"ram"`
+	StorageTotal types.String  `tfsdk:"storage_total"`
+	StorageUsed  types.String  `tfsdk:"storage_used"`
+	UsageRate    types.Float64 `tfsdk:"usage_rate"`
+	StorageRate  types.Float64 `tfsdk:"storage_rate"`
+	DtCreated    types.String  `tfsdk:"dt_created"`
+	DtModified   types.String  `tfsdk:"dt_modified"`
 
-	// computed only
-	CPUs      types.Int32  `tfsdk:"cpus"`
-	State     types.String `tfsdk:"state"`
-	OS        types.String `tfsdk:"os"`
-	AgentType types.String `tfsdk:"agent_type"`
-	PublicIP  types.String `tfsdk:"public_ip"`
-	PrivateIP types.String `tfsdk:"private_ip"`
-
-	// TODO: Implement remaining
-	// // MachineConfig
-	// AutoSnapshotEnabled   types.Bool   `tfsdk:"auto_snapshot_enabled"`
-	// AutoSnapshotFrequency types.String `tfsdk:"auto_snapshot_frequency"`
-	// AutoSnapshotSaveCount types.Int64  `tfsdk:"auto_snapshot_save_count"`
-	// AutoShutdownEnabled   types.Bool   `tfsdk:"auto_shutdown_enabled"`
-	// AutoShutdownTimeout   types.Int64  `tfsdk:"auto_shutdown_timeout"`
-	// AutoShutdownForce     types.Bool   `tfsdk:"auto_shutdown_force"`
-	// TakeInitialSnapshot   types.Bool   `tfsdk:"take_initial_snapshot"`
-	// RestorePointEnabled   types.Bool   `tfsdk:"restore_point_enabled"`
-	// RestorePointFrequency types.String `tfsdk:"restore_point_frequency"`
-	PublicIpType types.String `tfsdk:"public_ip_type"`
-	// StartupScriptID types.String `tfsdk:"startup_script_id"`
-	// EmailPassword   types.Bool   `tfsdk:"email_password"`
-	StartOnCreate types.Bool `tfsdk:"start_on_create"`
-	// EnableNvlink    types.Bool   `tfsdk:"enable_nvlink"`
-	AccessorIds types.List `tfsdk:"accessor_ids"`
+	//// Note: These fields are omitted
+	// DtDeleted    types.String  `tfsdk:"dtDeleted"`
+	// Reservation  *Reservation  `tfsdk:"reservation"`
+	// Accelerators []Accelerator `tfsdk:"accelerators"`
 }
 
 // machineResource is the resource implementation.
@@ -89,44 +104,228 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "Machine resource",
 		Attributes: map[string]schema.Attribute{
-			"id":           schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"name":         schema.StringAttribute{Required: true},
-			"machine_type": schema.StringAttribute{Required: true},
-			"template_id":  schema.StringAttribute{Required: true},
-			"disk_size":    schema.Int32Attribute{Required: true},
-			"region":       schema.StringAttribute{Required: true},
-			"network_id":   schema.StringAttribute{Optional: true, Computed: true},
-			"cpus":         schema.Int32Attribute{Computed: true, PlanModifiers: []planmodifier.Int32{int32planmodifier.UseStateForUnknown()}},
-			"state":        schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"os":           schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"agent_type":   schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"public_ip":    schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"private_ip":   schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-
-			"public_ip_type":  schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("dynamic")}, // TODO maybe do not set here, but add some condition later ?
-			"start_on_create": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false)},
-
-			// "accessor_ids": schema.ListAttribute{Optional: true, ElementType: types.StringType}, // TODO make default []
-			"accessor_ids": schema.ListAttribute{Required: true, ElementType: types.StringType}, // TODO make default []
-			// // MachineConfig
-			// "auto_snapshot_enabled":    schema.BoolAttribute{Computed: true},
-			// "auto_snapshot_frequency":  schema.StringAttribute{Computed: true},
-			// "auto_snapshot_save_count": schema.Int64Attribute{Computed: true},
-			// "auto_shutdown_enabled":    schema.BoolAttribute{Computed: true},
-			// "auto_shutdown_timeout":    schema.Int64Attribute{Computed: true},
-			// "auto_shutdown_force":      schema.BoolAttribute{Computed: true},
-			// "take_initial_snapshot":    schema.BoolAttribute{Computed: true},
-			// "restore_point_enabled":    schema.BoolAttribute{Computed: true},
-			// // "restore_point_frequency":  schema.StringAttribute{Computed: true},
-
-			// "startup_script_id": schema.StringAttribute{Computed: true},
-			// "email_password":    schema.BoolAttribute{Computed: true},
-
-			// "enable_nvlink":     schema.BoolAttribute{Computed: true},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The ID of the machine.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"name": schema.StringAttribute{
+				MarkdownDescription: "The name of the new machine.",
+				Required:            true,
+			},
+			"machine_type": schema.StringAttribute{
+				MarkdownDescription: "The machine type.",
+				Required:            true,
+			},
+			"template_id": schema.StringAttribute{
+				MarkdownDescription: "The template ID.",
+				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"disk_size": schema.Int64Attribute{
+				MarkdownDescription: "The disk size in gigabytes.",
+				Required:            true,
+				Validators: []validator.Int64{
+					int64validator.OneOf(50, 100, 250, 500, 1000, 2000),
+				},
+			},
+			"region": schema.StringAttribute{
+				MarkdownDescription: "The region to create the machine in.",
+				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"network_id": schema.StringAttribute{
+				MarkdownDescription: "The network ID. You can migrate machines between private networks and from the default network to a private network." +
+					" It is not possible to migrate a machine back to the default network." +
+					" If this is required, please file a support ticket.",
+				Optional: true,
+				Computed: true,
+				// stringplanmodifier.UseStateForUnknown() is not used here intentionally.
+				// If private network ID is not set explicitly in Terraform configuration,
+				// the ID of default one MUST not be passed during machine update.
+				// Otherwise API returns 404 error.
+				// So, cannot use ID from state for unknown, because it contains ID of default network.
+			},
+			"region_full": schema.StringAttribute{
+				MarkdownDescription: "Full machine region name.",
+				Computed:            true,
+			},
+			"cpus": schema.Int64Attribute{
+				MarkdownDescription: "Number of CPUs.",
+				Computed:            true,
+			},
+			"state": schema.StringAttribute{
+				MarkdownDescription: "State of the machine.",
+				Computed:            true,
+			},
+			"os": schema.StringAttribute{
+				MarkdownDescription: "Operating system of the machine.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"agent_type": schema.StringAttribute{
+				MarkdownDescription: "Agent type of the machine.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"public_ip_type": schema.StringAttribute{
+				MarkdownDescription: "The public IP type. Possible value: `static`, `dynamic`, `none`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("dynamic"),
+				Validators: []validator.String{
+					stringvalidator.OneOf([]string{"static", "dynamic", "none"}...),
+				},
+			},
+			"public_ip": schema.StringAttribute{
+				MarkdownDescription: "Public IP address of the machine.",
+				Computed:            true,
+			},
+			"private_ip": schema.StringAttribute{
+				MarkdownDescription: "Private IP address of the machine.",
+				Computed:            true,
+			},
+			"start_on_create": schema.BoolAttribute{
+				MarkdownDescription: "Whether to start the machine on creation.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			// Auto Snapshot
+			"auto_snapshot_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether to enable auto snapshots.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"auto_snapshot_frequency": schema.StringAttribute{
+				MarkdownDescription: "The auto snapshot frequency. Possible values: `hourly`, `daily`, `weekly`, `monthly`.",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf([]string{"hourly", "daily", "weekly", "monthly"}...),
+				},
+			},
+			"auto_snapshot_save_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of auto snapshots to save. Must be between 1 and 9 if `auto_snapshot_enabled` is true.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.Between(1, 9),
+				},
+			},
+			// Auto Shutdown
+			"auto_shutdown_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether to enable auto shutdown.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"auto_shutdown_timeout": schema.Int64Attribute{
+				MarkdownDescription: "The auto shutdown timeout in hours. Must be set if `auto_shutdown_enabled` is true. " +
+					"May be troubles with updating the value, seems like Paperspace API issue." +
+					"Disable auto shutdown and then enable with different option to update.",
+				Optional: true,
+				Validators: []validator.Int64{
+					int64validator.OneOf(1, 8, 24, 168),
+				},
+			},
+			"auto_shutdown_force": schema.BoolAttribute{
+				MarkdownDescription: "Whether to force shutdown the machine. " +
+					"May be troubles with updating the value, seems like Paperspace API issue." +
+					"Disable auto shutdown and then enable with different option to update.",
+				Optional: true,
+				Computed: true,
+			},
+			// Restore Point (only computed, user input is not implemented yet)
+			"restore_point_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether to use initial snapshot as a restore point.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"restore_point_frequency": schema.StringAttribute{
+				MarkdownDescription: "The restore point frequency. Possible values: `shutdown`.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators: []validator.String{
+					stringvalidator.OneOf([]string{"shutdown"}...),
+				},
+			},
+			"restore_point_snapshot_id": schema.StringAttribute{
+				MarkdownDescription: "The restore point snapshot ID.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			// Attributes which apply only on creation
+			"enable_nvlink": schema.BoolAttribute{
+				MarkdownDescription: "Whether to enable NVLink.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(), // Forces resource replacement if changed
+				},
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
+			"take_initial_snapshot": schema.BoolAttribute{
+				MarkdownDescription: "Whether to take an initial snapshot. Applies only on resource creation.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"startup_script_id": schema.StringAttribute{
+				MarkdownDescription: "The startup script ID. Forces resource replacement if changed.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"email_password": schema.BoolAttribute{
+				MarkdownDescription: "Whether to email the password. Applies only on resource creation.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(true),
+			},
+			// Computed only
+			"ram": schema.StringAttribute{
+				MarkdownDescription: "RAM amount of the machine.",
+				Computed:            true,
+			},
+			"storage_total": schema.StringAttribute{
+				MarkdownDescription: "Storage total of the machine.",
+				Computed:            true,
+			},
+			"storage_used": schema.StringAttribute{
+				MarkdownDescription: "Storage used of the machine.",
+				Computed:            true,
+			},
+			"usage_rate": schema.Float64Attribute{
+				MarkdownDescription: "Usage rate of the machine.",
+				Computed:            true,
+			},
+			"storage_rate": schema.Float64Attribute{
+				MarkdownDescription: "Storage rate of the machine.",
+				Computed:            true,
+			},
+			"dt_created": schema.StringAttribute{
+				MarkdownDescription: "Created date timestamp of the machine.",
+				Computed:            true,
+			},
+			"dt_modified": schema.StringAttribute{
+				MarkdownDescription: "Modified date timestamp of the machine.",
+				Computed:            true,
+			},
+			// TODO: Implement change on resource update, so machine accessors are being updated
+			"accessor_ids": schema.ListAttribute{
+				MarkdownDescription: "The IDs of users to grant access to the machine. Applies only on resource creation.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
 		},
 	}
 }
 
+// TODO: Add timeouts https://developer.hashicorp.com/terraform/plugin/framework/resources/timeouts
 // Create a new resource.
 func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan machineResourceModel
@@ -140,47 +339,39 @@ func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest
 
 	// Generate API request body from plan and create new machine
 
-	var reqData ppclient.MachineConfig
-
-	reqData.Name = plan.Name.ValueString()
-	reqData.MachineType = plan.MachineType.ValueString()
-	reqData.TemplateID = plan.TemplateID.ValueString()
-	reqData.NetworkID = plan.NetworkID.ValueString()
-	reqData.DiskSize = int(plan.DiskSize.ValueInt32())
-	reqData.Region = plan.Region.ValueString()
-	reqData.PublicIpType = plan.PublicIpType.ValueString()
-	reqData.StartOnCreate = plan.StartOnCreate.ValueBool()
-
-	var accessors []string
-	// TODO: Consider better ways to do so
-	for _, item := range plan.AccessorIds.Elements() {
+	accessors := []string{}
+	for _, item := range plan.AccessorIDs.Elements() {
 		if strValue, ok := item.(types.String); ok {
 			accessors = append(accessors, strValue.ValueString()) // Extract the string value
 		}
 	}
-	reqData.AccessorIds = accessors
 
-	// TODO: Check and implement remaining
-	//
-	// reqData.AutoSnapshotEnabled = plan.AutoSnapshotEnabled.ValueBool()
-	// reqData.AutoSnapshotFrequency = plan.AutoSnapshotFrequency.ValueString()
-	// reqData.AutoSnapshotSaveCount = int(plan.AutoSnapshotSaveCount.ValueInt64())
-	// reqData.AutoShutdownEnabled = plan.AutoShutdownEnabled.ValueBool()
-	// reqData.AutoShutdownTimeout = int(plan.AutoShutdownTimeout.ValueInt64())
-	// reqData.AutoShutdownForce = plan.AutoShutdownForce.ValueBool()
-	// reqData.TakeInitialSnapshot = plan.TakeInitialSnapshot.ValueBool()
-	// reqData.RestorePointEnabled = plan.RestorePointEnabled.ValueBool()
-	// reqData.RestorePointFrequency = plan.RestorePointFrequency.ValueString()
-	// reqData.StartupScriptID = plan.StartupScriptID.ValueString()
-	// reqData.EmailPassword = plan.EmailPassword.ValueBool()
-	// reqData.StartOnCreate = plan.StartOnCreate.ValueBool()
-	// reqData.EnableNvlink = plan.EnableNvlink.ValueBool()
+	reqData := ppclient.MachineCreateConfig{
+		Name:                  plan.Name.ValueString(),        // required
+		MachineType:           plan.MachineType.ValueString(), // required
+		TemplateID:            plan.TemplateID.ValueString(),  // required
+		DiskSize:              plan.DiskSize.ValueInt64(),     // required
+		Region:                plan.Region.ValueString(),      // required
+		NetworkID:             plan.NetworkID.ValueString(),
+		PublicIPType:          plan.PublicIPType.ValueString(),
+		StartOnCreate:         getValueBoolPointer(plan.StartOnCreate),
+		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
+		AutoSnapshotFrequency: plan.AutoSnapshotFrequency.ValueString(),
+		AutoSnapshotSaveCount: getValueInt64Pointer(plan.AutoSnapshotSaveCount),
+		AutoShutdownEnabled:   getValueBoolPointer(plan.AutoShutdownEnabled),
+		AutoShutdownTimeout:   getValueInt64Pointer(plan.AutoShutdownTimeout),
+		AutoShutdownForce:     getValueBoolPointer(plan.AutoShutdownForce),
+		EnableNvlink:          getValueBoolPointer(plan.EnableNvlink),
+		TakeInitialSnapshot:   getValueBoolPointer(plan.TakeInitialSnapshot),
+		StartupScriptID:       plan.StartupScriptID.ValueString(),
+		EmailPassword:         getValueBoolPointer(plan.EmailPassword),
+		AccessorIDs:           accessors,
+	}
 
-	jsonData, err := json.MarshalIndent(reqData, "", " ")
-	tflog.Info(ctx, "Sent req data: "+string(jsonData))
+	jsonData, _ := json.MarshalIndent(reqData, "", " ")
+	tflog.Info(ctx, "Sending create req data: "+string(jsonData))
 
-	// TODO: If start_on_create is true, implement waiting for machine to start
-	machine, err := r.client.CreateMachine(reqData, ctx)
+	machine, err := r.client.CreateMachine(reqData)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating machine",
@@ -201,25 +392,8 @@ func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest
 	// Save response data into the Terraform state.
 	// Only computed attributes must be updated here
 
-	// TODO: Fill plan with all remaining values
-
 	plan.ID = types.StringValue(machine.ID)
-	plan.NetworkID = types.StringValue(machine.NetworkID)
-	plan.CPUs = types.Int32Value(int32(machine.CPUs))
-	plan.State = types.StringValue(machine.State)
-	plan.OS = types.StringValue(machine.OS)
-	plan.AgentType = types.StringValue(machine.AgentType)
-	plan.PrivateIP = types.StringValue(machine.PrivateIP)
-
-	// Nullable field
-	if machine.PublicIP != nil {
-		plan.PublicIP = types.StringValue(*machine.PublicIP)
-	} else {
-		plan.PublicIP = types.StringNull()
-	}
-
-	// TODO: Consider this, it may be useful
-	// plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	fillStateWithMachineData(&plan, machine)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -231,10 +405,115 @@ func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest
 
 // Read refreshes the Terraform state with the latest data.
 func (r *machineResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	// Get current state
+	var state machineResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get refreshed machine value from Paperspace
+	machine, err := r.client.GetMachine(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Paperspace Machine",
+			"Could not read Paperspace machine ID "+state.ID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	// TODO: Remove log, or remove indent
+	machineJson, err := json.MarshalIndent(machine, "", " ")
+	if err != nil {
+		tflog.Error(ctx, "Could not marshal fetched machine struct: "+err.Error())
+	}
+	tflog.Info(ctx, "Fetched machine data: "+string(machineJson))
+
+	// ID not needed here
+	fillStateWithMachineData(&state, machine)
+
+	// Set refreshed state
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
-// Update updates the resource and sets the updated Terraform state on success.
+// Updates the resource and sets the updated Terraform state on success.
 func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// Retrieve values from plan
+	var plan machineResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Generate API request body from plan
+
+	var accessors []string
+	for _, item := range plan.AccessorIDs.Elements() {
+		if strValue, ok := item.(types.String); ok {
+			accessors = append(accessors, strValue.ValueString()) // Extract the string value
+		}
+	}
+
+	reqData := ppclient.MachineUpdateConfig{
+		Name:         plan.Name.ValueString(),
+		MachineType:  plan.MachineType.ValueString(),
+		NetworkID:    plan.NetworkID.ValueString(),
+		DiskSize:     int64(plan.DiskSize.ValueInt64()),
+		PublicIPType: plan.PublicIPType.ValueString(),
+
+		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
+		AutoSnapshotFrequency: plan.AutoSnapshotFrequency.ValueString(),
+		AutoSnapshotSaveCount: getValueInt64Pointer(plan.AutoSnapshotSaveCount),
+		AutoShutdownEnabled:   getValueBoolPointer(plan.AutoShutdownEnabled),
+		AutoShutdownTimeout:   getValueInt64Pointer(plan.AutoShutdownTimeout),
+		AutoShutdownForce:     getValueBoolPointer(plan.AutoShutdownForce),
+	}
+
+	jsonData, _ := json.MarshalIndent(reqData, "", " ")
+	tflog.Info(ctx, "Sending update req data: "+string(jsonData))
+
+	err := r.client.UpdateMachine(plan.ID.ValueString(), reqData)
+
+	//
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating machine",
+			"Could not update machine, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Fetch updated machine
+	updatedMachine, err := r.client.GetMachine(plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading HashiCups Order",
+			"Could not read HashiCups order ID "+plan.ID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	// TODO: Remove indent JSON, it was initially added for better debug only
+	updatedMachineJson, err := json.MarshalIndent(updatedMachine, "", " ")
+	if err != nil {
+		tflog.Error(ctx, "Could not marshal updated machine struct: "+err.Error())
+	}
+	tflog.Info(ctx, "Updated machine data: "+string(updatedMachineJson))
+
+	fillStateWithMachineData(&plan, updatedMachine)
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -247,7 +526,7 @@ func (r *machineResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.DeleteMachine(state.ID.ValueString(), ctx)
+	err := r.client.DeleteMachine(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting Machine",
@@ -270,11 +549,59 @@ func (r *machineResource) Configure(_ context.Context, req resource.ConfigureReq
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *hashicups.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *ppclient.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
 	r.client = client
+}
+
+func fillStateWithMachineData(state *machineResourceModel, machine *ppclient.Machine) {
+	state.Name = types.StringValue(machine.Name)
+	state.State = types.StringValue(machine.State)
+	state.OS = types.StringValue(machine.OS)
+	state.MachineType = types.StringValue(machine.MachineType)
+	state.AgentType = types.StringValue(machine.AgentType)
+	state.CPUs = types.Int64Value(int64(machine.CPUs))
+	state.RAM = types.StringValue(machine.RAM)
+	state.StorageTotal = types.StringValue(machine.StorageTotal)
+	state.StorageUsed = types.StringValue(machine.StorageUsed)
+	state.RegionFull = types.StringValue(machine.RegionFull)
+	state.PrivateIP = types.StringValue(machine.PrivateIP)
+	state.NetworkID = types.StringValue(machine.NetworkID)
+	state.PublicIP = types.StringPointerValue(machine.PublicIP) // Nullable field
+	state.PublicIPType = types.StringValue(machine.PublicIPType)
+	state.AutoShutdownEnabled = types.BoolValue(machine.AutoShutdownEnabled)
+	state.AutoShutdownTimeout = types.Int64PointerValue(machine.AutoShutdownTimeout) // Nullable field
+	state.AutoShutdownForce = types.BoolValue(machine.AutoShutdownForce)
+	state.AutoSnapshotEnabled = types.BoolValue(machine.AutoSnapshotEnabled)
+	state.AutoSnapshotFrequency = types.StringPointerValue(machine.AutoSnapshotFrequency) // Nullable field
+	state.AutoSnapshotSaveCount = types.Int64PointerValue(machine.AutoSnapshotSaveCount)  // Nullable field
+	state.RestorePointEnabled = types.BoolValue(machine.RestorePointEnabled)
+	state.RestorePointFrequency = types.StringPointerValue(machine.RestorePointFrequency)   // Nullable field
+	state.RestorePointSnapshotID = types.StringPointerValue(machine.RestorePointSnapshotID) // Nullable field
+	state.UsageRate = types.Float64Value(machine.UsageRate)
+	state.StorageRate = types.Float64Value(machine.StorageRate)
+	state.DtCreated = types.StringValue(machine.DtCreated)
+	state.DtModified = types.StringValue(machine.DtModified)
+}
+
+// Private
+
+// Returns nil for unknown and ValueBoolPointer for known
+func getValueBoolPointer(attr basetypes.BoolValue) *bool {
+	if attr.IsUnknown() {
+		return nil
+	}
+	return attr.ValueBoolPointer()
+}
+
+// Returns nil for unknown and ValueInt64Pointer for known
+func getValueInt64Pointer(attr basetypes.Int64Value) *int64 {
+	if attr.IsUnknown() {
+		return nil
+	}
+	return attr.ValueInt64Pointer()
 }

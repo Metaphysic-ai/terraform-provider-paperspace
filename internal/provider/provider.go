@@ -39,12 +39,10 @@ func (p *paperspaceProvider) Schema(ctx context.Context, req provider.SchemaRequ
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
-				// TODO: Add MarkdownDescription
-				Optional:  true, // May be set over ENV VAR if true
-				Sensitive: true,
+				MarkdownDescription: "An API key or access token. May be set via the PAPERSPACE_API_KEY environment variable.",
+				Optional:            true,
+				Sensitive:           true,
 			},
-
-			// TODO: Consider 'namespace' here
 		},
 	}
 }
@@ -110,7 +108,7 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 	tflog.Info(ctx, "Creating Paperspace client")
 
 	// Create a new Paperspace client using the configuration values
-	client, err := ppclient.NewClient(nil, &api_key)
+	client, err := ppclient.NewClient(nil, &api_key, ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Paperspace API Client",

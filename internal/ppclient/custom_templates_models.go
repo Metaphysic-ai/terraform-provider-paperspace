@@ -11,7 +11,7 @@ type CustomTemplate struct {
 	AgentType             string                 `json:"agentType"`
 	OperatingSystemLabel  string                 `json:"operatingSystemLabel"`
 	Region                string                 `json:"region"`
-	DefaultSizeGb         int                    `json:"defaultSizeGb"`
+	DefaultSizeGb         int64                  `json:"defaultSizeGb"`
 	AvailableMachineTypes []AvailableMachineType `json:"availableMachineTypes"`
 	ParentMachineID       string                 `json:"parentMachineId"`
 	DtCreated             string                 `json:"dtCreated"`
