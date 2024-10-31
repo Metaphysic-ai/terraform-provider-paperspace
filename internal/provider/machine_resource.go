@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"terraform-provider-paperspace/internal/ppclient"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -416,6 +417,13 @@ func (r *machineResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// Get refreshed machine value from Paperspace
 	machine, err := r.client.GetMachine(state.ID.ValueString())
 	if err != nil {
+		// Avoid error due to 404 status. Machine may be deleted outside provider, so handle this as expected case.
+		if strings.Contains(err.Error(), "status: 404") {
+			tflog.Warn(ctx, fmt.Sprintf("Machine %s not found, removing from state", state.ID.ValueString()))
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error Reading Paperspace Machine",
 			"Could not read Paperspace machine ID "+state.ID.ValueString()+": "+err.Error(),
@@ -494,8 +502,8 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 	updatedMachine, err := r.client.GetMachine(plan.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading HashiCups Order",
-			"Could not read HashiCups order ID "+plan.ID.ValueString()+": "+err.Error(),
+			"Error Reading updated Paperspace machine",
+			"Could not read Paperspace machine ID "+plan.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
