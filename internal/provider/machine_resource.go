@@ -34,7 +34,7 @@ func NewMachineResource() resource.Resource {
 }
 
 // Maps the resource schema data.
-// State/Plan structure
+// State/Plan structure.
 type machineResourceModel struct {
 	// MachineCreateConfig
 	Name                   types.String `tfsdk:"name"`         // required
@@ -461,18 +461,11 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Generate API request body from plan
 
-	var accessors []string
-	for _, item := range plan.AccessorIDs.Elements() {
-		if strValue, ok := item.(types.String); ok {
-			accessors = append(accessors, strValue.ValueString()) // Extract the string value
-		}
-	}
-
 	reqData := ppclient.MachineUpdateConfig{
 		Name:         plan.Name.ValueString(),
 		MachineType:  plan.MachineType.ValueString(),
 		NetworkID:    plan.NetworkID.ValueString(),
-		DiskSize:     int64(plan.DiskSize.ValueInt64()),
+		DiskSize:     plan.DiskSize.ValueInt64(),
 		PublicIPType: plan.PublicIPType.ValueString(),
 
 		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
@@ -534,8 +527,14 @@ func (r *machineResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.DeleteMachine(state.ID.ValueString())
+	machineID := state.ID.ValueString()
+	err := r.client.DeleteMachine(machineID)
 	if err != nil {
+		if strings.Contains(err.Error(), "status: 404") {
+			tflog.Info(ctx, fmt.Sprintf("Machine %s not found, assuming already deleted", machineID))
+			return
+		}
+
 		resp.Diagnostics.AddError(
 			"Error Deleting Machine",
 			"Could not delete machine, unexpected error: "+err.Error(),
@@ -572,7 +571,7 @@ func fillStateWithMachineData(state *machineResourceModel, machine *ppclient.Mac
 	state.OS = types.StringValue(machine.OS)
 	state.MachineType = types.StringValue(machine.MachineType)
 	state.AgentType = types.StringValue(machine.AgentType)
-	state.CPUs = types.Int64Value(int64(machine.CPUs))
+	state.CPUs = types.Int64Value(machine.CPUs)
 	state.RAM = types.StringValue(machine.RAM)
 	state.StorageTotal = types.StringValue(machine.StorageTotal)
 	state.StorageUsed = types.StringValue(machine.StorageUsed)
@@ -598,7 +597,7 @@ func fillStateWithMachineData(state *machineResourceModel, machine *ppclient.Mac
 
 // Private
 
-// Returns nil for unknown and ValueBoolPointer for known
+// Returns nil for unknown and ValueBoolPointer for known.
 func getValueBoolPointer(attr basetypes.BoolValue) *bool {
 	if attr.IsUnknown() {
 		return nil
@@ -606,7 +605,7 @@ func getValueBoolPointer(attr basetypes.BoolValue) *bool {
 	return attr.ValueBoolPointer()
 }
 
-// Returns nil for unknown and ValueInt64Pointer for known
+// Returns nil for unknown and ValueInt64Pointer for known.
 func getValueInt64Pointer(attr basetypes.Int64Value) *int64 {
 	if attr.IsUnknown() {
 		return nil

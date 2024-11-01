@@ -55,7 +55,7 @@ func fetchAllItems[T any](c *Client, allItems *[]T, path string, params map[stri
 	return nil
 }
 
-// Helper function to build the query string from a map of parameters
+// Helper function to build the query string from a map of parameters.
 func buildQueryString(params map[string]string) string {
 	q := ""
 	for k, v := range params {

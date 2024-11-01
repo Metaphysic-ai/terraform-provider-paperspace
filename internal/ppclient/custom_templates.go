@@ -25,7 +25,7 @@ func (c *Client) GetCustomTemplates() (*[]CustomTemplate, error) {
 		allItems = append(allItems, item)
 	}
 
-	sortCustomTemplates(allItems, "DtCreated")
+	err = sortCustomTemplates(allItems, "DtCreated")
 	if err != nil {
 		return nil, err
 	}

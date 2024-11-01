@@ -39,7 +39,7 @@ func (c *Client) CreateMachine(machineCreateConfig MachineCreateConfig) (*Machin
 	// WaitForEvent Section
 
 	tflog.Info(*c.Context, fmt.Sprintf("Waiting for machine event '%s' to complete, event id: %s", mashineResponse.Event.Name, mashineResponse.Event.ID))
-	_, err = c.waitForEvent(mashineResponse.Event.ID)
+	err = c.waitForEvent(mashineResponse.Event.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +148,7 @@ func (c *Client) DeleteMachine(machineID string) error {
 	for i := 0; i < maxAttempts; i++ {
 		_, err := c.GetMachine(machineID)
 		if err != nil {
-			tflog.Info(*c.Context, fmt.Sprintf("Machine %s not found, assuming has been deleted successfully", machineID))
-			return nil
+			return err
 		}
 
 		// Machine still exists, wait for the next check

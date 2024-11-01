@@ -70,8 +70,6 @@ func (r *machineResource) ValidateConfig(ctx context.Context, req resource.Valid
 			addAttributeDepsError(&resp.Diagnostics, "restore_point_enabled", []string{"restore_point_frequency"})
 		}
 	}
-
-	return
 }
 
 func addAttributeDepsError(diags *diag.Diagnostics, attrName string, deps []string) {

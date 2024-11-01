@@ -197,7 +197,7 @@ func TestAccMachineResourceDefaults(t *testing.T) {
 	})
 }
 
-// Test Create and Start
+// Test Create and Start.
 func TestAccMachineResourceCreateStart(t *testing.T) {
 	// Especially useful for CI, to skip test using 'go test -short'
 	if testing.Short() {

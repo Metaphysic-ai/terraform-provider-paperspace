@@ -34,7 +34,6 @@ func (d *customTemplatesDataSource) Metadata(_ context.Context, req datasource.M
 
 //// Data model types
 
-// coffeesIngredientsModel maps coffee ingredients data
 type availableMachineTypeModel struct {
 	MachineTypeLabel types.String `tfsdk:"machine_type_label"`
 	IsAvailable      types.Bool   `tfsdk:"is_available"`
@@ -139,7 +138,7 @@ func (d *customTemplatesDataSource) Read(ctx context.Context, req datasource.Rea
 			AgentType:            types.StringValue(customTemplate.AgentType),
 			OperatingSystemLabel: types.StringValue(customTemplate.OperatingSystemLabel),
 			Region:               types.StringValue(customTemplate.Region),
-			DefaultSizeGb:        types.Int64Value(int64(customTemplate.DefaultSizeGb)),
+			DefaultSizeGb:        types.Int64Value(customTemplate.DefaultSizeGb),
 			ParentMachineID:      types.StringValue(customTemplate.ParentMachineID),
 			DtCreated:            types.StringValue(customTemplate.DtCreated),
 		}

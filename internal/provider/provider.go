@@ -126,7 +126,7 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 	tflog.Info(ctx, "Configured Paperspace client", map[string]any{"success": true})
 }
 
-// Add resources to provider
+// Add resources to provider.
 func (p *paperspaceProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewMachineResource,

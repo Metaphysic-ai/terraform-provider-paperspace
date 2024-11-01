@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// Returns number of each found machine event type (name)
+// Returns number of each found machine event type (name).
 func (c *Client) GetMachineEventsStateStat() (error, map[string]int) {
 	allItems := []Event{}
 	stat := map[string]int{}
@@ -29,7 +29,7 @@ func (c *Client) GetMachineEventsStateStat() (error, map[string]int) {
 	return nil, stat
 }
 
-func (c *Client) waitForEvent(eventID string) (*Event, error) {
+func (c *Client) waitForEvent(eventID string) error {
 	url := fmt.Sprintf("%s/machine-events/%s", c.HostURL, eventID)
 
 	var event Event
@@ -44,37 +44,37 @@ func (c *Client) waitForEvent(eventID string) (*Event, error) {
 		// Make the request
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		resp, err := c.doRequest(req)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Parse the response
 		err = json.Unmarshal(resp, &event)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Check the event state
 		if event.State == "done" {
-			return &event, nil
+			return nil
 		}
 		if event.Error != nil {
-			return nil, fmt.Errorf("error during event processing: %s", *event.Error)
+			return fmt.Errorf("error during event processing: %s", *event.Error)
 		}
 
 		// There is a case, when {"state": "error", "error": null}
 		if event.State == "error" {
-			return nil, fmt.Errorf("unknown error during event %s processing", eventID)
+			return fmt.Errorf("unknown error during event %s processing", eventID)
 		}
 
 		// Wait for either the polling interval or the timeout
 		select {
 		case <-time.After(pollInterval):
 		case <-timer:
-			return nil, fmt.Errorf("timeout reached while waiting for event %s", eventID)
+			return fmt.Errorf("timeout reached while waiting for event %s", eventID)
 		}
 	}
 }
@@ -97,7 +97,7 @@ func (c *Client) waitForMachineEvents(machineID string) error {
 
 		tflog.Info(*c.Context, fmt.Sprintf("Waiting for machine event '%s' to complete, event id: %s", event.Name, event.ID))
 
-		_, err := c.waitForEvent(event.ID)
+		err := c.waitForEvent(event.ID)
 		if err != nil {
 			return err
 		}
