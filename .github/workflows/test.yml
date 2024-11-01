@@ -1,12 +1,19 @@
 # Terraform Provider testing workflow.
 name: Test
 
-on: [pull_request, push]
-  branches:
-    - main
-  paths-ignore:
-    - 'README.md'
-    - 'CHANGELOG.md'
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
 
 permissions:
   contents: read
