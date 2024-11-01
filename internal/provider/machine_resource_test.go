@@ -199,6 +199,11 @@ func TestAccMachineResourceDefaults(t *testing.T) {
 
 // Test Create and Start
 func TestAccMachineResourceCreateStart(t *testing.T) {
+	// Especially useful for CI, to skip test using 'go test -short'
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
+
 	resource.ParallelTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
