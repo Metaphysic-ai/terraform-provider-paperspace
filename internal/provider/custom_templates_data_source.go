@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"terraform-provider-paperspace/internal/ppclient"
+	"terraform-provider-paperspace/internal/psclient"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -24,7 +24,7 @@ func NewCustomTemplatesDataSource() datasource.DataSource {
 
 // Allow your data source type to store a reference to the Paperspace client.
 type customTemplatesDataSource struct {
-	client *ppclient.Client
+	client *psclient.Client
 }
 
 // Metadata returns the data source type name.
@@ -170,11 +170,11 @@ func (d *customTemplatesDataSource) Configure(_ context.Context, req datasource.
 		return
 	}
 
-	client, ok := req.ProviderData.(*ppclient.Client)
+	client, ok := req.ProviderData.(*psclient.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *ppclient.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *psclient.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return

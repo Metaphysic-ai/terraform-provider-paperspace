@@ -1,4 +1,4 @@
-package ppclient
+package psclient
 
 type AvailableMachineType struct {
 	MachineTypeLabel string `json:"machineTypeLabel"`

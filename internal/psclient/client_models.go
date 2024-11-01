@@ -1,4 +1,4 @@
-package ppclient
+package psclient
 
 type Team struct {
 	Name                  string  `json:"name"`

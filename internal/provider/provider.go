@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"os"
-	"terraform-provider-paperspace/internal/ppclient"
+	"terraform-provider-paperspace/internal/psclient"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -108,7 +108,7 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 	tflog.Info(ctx, "Creating Paperspace client")
 
 	// Create a new Paperspace client using the configuration values
-	client, err := ppclient.NewClient(nil, &api_key, ctx)
+	client, err := psclient.NewClient(nil, &api_key, ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Paperspace API Client",

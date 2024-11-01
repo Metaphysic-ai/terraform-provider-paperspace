@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"terraform-provider-paperspace/internal/ppclient"
+	"terraform-provider-paperspace/internal/psclient"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -86,7 +86,7 @@ type machineResourceModel struct {
 // machineResource is the resource implementation.
 type machineResource struct {
 	// Allow resource to store a reference to the client
-	client *ppclient.Client
+	client *psclient.Client
 }
 
 // Define the resource type name, which is how the resource is used in Terraform configurations.
@@ -347,7 +347,7 @@ func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 	}
 
-	reqData := ppclient.MachineCreateConfig{
+	reqData := psclient.MachineCreateConfig{
 		Name:                  plan.Name.ValueString(),        // required
 		MachineType:           plan.MachineType.ValueString(), // required
 		TemplateID:            plan.TemplateID.ValueString(),  // required
@@ -461,7 +461,7 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Generate API request body from plan
 
-	reqData := ppclient.MachineUpdateConfig{
+	reqData := psclient.MachineUpdateConfig{
 		Name:         plan.Name.ValueString(),
 		MachineType:  plan.MachineType.ValueString(),
 		NetworkID:    plan.NetworkID.ValueString(),
@@ -551,12 +551,12 @@ func (r *machineResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 
-	client, ok := req.ProviderData.(*ppclient.Client)
+	client, ok := req.ProviderData.(*psclient.Client)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *ppclient.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *psclient.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
@@ -565,7 +565,7 @@ func (r *machineResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.client = client
 }
 
-func fillStateWithMachineData(state *machineResourceModel, machine *ppclient.Machine) {
+func fillStateWithMachineData(state *machineResourceModel, machine *psclient.Machine) {
 	state.Name = types.StringValue(machine.Name)
 	state.State = types.StringValue(machine.State)
 	state.OS = types.StringValue(machine.OS)

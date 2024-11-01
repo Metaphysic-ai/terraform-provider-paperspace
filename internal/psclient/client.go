@@ -1,4 +1,4 @@
-package ppclient
+package psclient
 
 import (
 	"context"
