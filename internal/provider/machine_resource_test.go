@@ -15,8 +15,8 @@ var testAccMachineResourceConfigs = map[string]string{
 	"CreateRead": providerConfig + `
 resource "paperspace_machine" "test" {
   name            = "paperspace-provider-test-CreateRead"
-  machine_type    = "C1"
-  template_id  	  = "tkni3aa4"
+  machine_type    = "C2"
+  template_id  	  = "t0nspur5"
   disk_size       = 50
   region          = "ny2"
 
@@ -31,12 +31,12 @@ resource "paperspace_machine" "test" {
 resource "paperspace_machine" "test" {
   name            = "paperspace-provider-test-UpdateRead"
   machine_type    = "C3"
-  template_id  	  = "tkni3aa4"
+  template_id  	  = "t0nspur5"
   disk_size       = 100
   region          = "ny2"
   public_ip_type  = "static"
   accessor_ids    = []
-  start_on_create = false
+  state 		  = "off"
 
   auto_snapshot_enabled = true
   auto_snapshot_save_count = 1
@@ -52,8 +52,8 @@ resource "paperspace_machine" "test" {
 	"CreateReadDefaults": providerConfig + `
 resource "paperspace_machine" "test_defaults" {
   name            = "paperspace-provider-test-CreateReadDefaults"
-  machine_type    = "C1"
-  template_id  	  = "tkni3aa4"
+  machine_type    = "C2"
+  template_id  	  = "t0nspur5"
   disk_size       = 50
   region          = "ny2"
 }
@@ -62,12 +62,38 @@ resource "paperspace_machine" "test_defaults" {
 	"CreateStart": providerConfig + `
 resource "paperspace_machine" "test_start" {
   name            = "paperspace-provider-test-CreateStart"
-  machine_type    = "C1"
-  template_id  	  = "tkni3aa4"
+  machine_type    = "C2"
+  template_id  	  = "t0nspur5"
   disk_size       = 50
   region          = "ny2"
 
-  start_on_create = true
+  state 		  = "ready"
+  email_password  = false
+}
+`,
+
+	"UpdateStarted": providerConfig + `
+resource "paperspace_machine" "test_start" {
+  name            = "paperspace-provider-test-UpdateStarted"
+  machine_type    = "C2"
+  template_id  	  = "t0nspur5"
+  disk_size       = 100
+  region          = "ny2"
+
+  state 		  = "ready"
+  email_password  = false
+}
+`,
+
+	"StopStarted": providerConfig + `
+resource "paperspace_machine" "test_start" {
+  name            = "paperspace-provider-test-UpdateStarted"
+  machine_type    = "C2"
+  template_id  	  = "t0nspur5"
+  disk_size       = 100
+  region          = "ny2"
+
+  state 		  = "off"
   email_password  = false
 }
 `,
@@ -86,18 +112,17 @@ func TestAccMachineResource(t *testing.T) {
 
 						// Verify created machine attributes
 						"name":                  "paperspace-provider-test-CreateRead",
-						"machine_type":          "C1",
-						"template_id":           "tkni3aa4",
+						"machine_type":          "C2",
+						"template_id":           "t0nspur5",
 						"disk_size":             "50",
 						"region":                "ny2",
 						"public_ip_type":        "dynamic",
 						"enable_nvlink":         "false",
 						"take_initial_snapshot": "true",
 						"email_password":        "false",
-						"start_on_create":       "false",
+						"state":                 "off",
 
 						// Verify machine has Computed attributes filled
-						"state":       "off",
 						"cpus":        "1",
 						"region_full": "East Coast (NY2)",
 
@@ -134,11 +159,11 @@ func TestAccMachineResource(t *testing.T) {
 						// Verify machine updated
 						"name":                     "paperspace-provider-test-UpdateRead",
 						"machine_type":             "C3",
-						"template_id":              "tkni3aa4",
+						"template_id":              "t0nspur5",
 						"disk_size":                "100",
 						"region":                   "ny2",
 						"public_ip_type":           "static",
-						"start_on_create":          "false",
+						"state":                    "off",
 						"auto_snapshot_enabled":    "true",
 						"auto_snapshot_save_count": "1",
 						"auto_snapshot_frequency":  "daily",
@@ -181,7 +206,6 @@ func TestAccMachineResourceDefaults(t *testing.T) {
 						"enable_nvlink":         "false",
 						"public_ip_type":        "dynamic",
 						"restore_point_enabled": "false",
-						"start_on_create":       "false",
 						"state":                 "off",
 						"take_initial_snapshot": "false",
 
@@ -198,7 +222,7 @@ func TestAccMachineResourceDefaults(t *testing.T) {
 }
 
 // Test Create and Start.
-func TestAccMachineResourceCreateStart(t *testing.T) {
+func TestAccMachineResourceCreateStartUpdateStop(t *testing.T) {
 	// Especially useful for CI, to skip test using 'go test -short'
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
@@ -206,16 +230,37 @@ func TestAccMachineResourceCreateStart(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{{
-			Config: testAccMachineResourceConfigs["CreateStart"],
-			Check: resource.ComposeAggregateTestCheckFunc(genTestCheckFuncs(
-				"paperspace_machine.test_start",
-				map[string]string{
-					"start_on_create": "true",
-					"state":           "ready",
-				},
-			)...),
-		}},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccMachineResourceConfigs["CreateStart"],
+				Check: resource.ComposeAggregateTestCheckFunc(genTestCheckFuncs(
+					"paperspace_machine.test_start",
+					map[string]string{
+						"state": "ready",
+					},
+				)...),
+			},
+			{
+				Config: testAccMachineResourceConfigs["UpdateStarted"],
+				Check: resource.ComposeAggregateTestCheckFunc(genTestCheckFuncs(
+					"paperspace_machine.test_start",
+					map[string]string{
+						"name":      "paperspace-provider-test-UpdateStarted",
+						"state":     "ready",
+						"disk_size": "100",
+					},
+				)...),
+			},
+			{
+				Config: testAccMachineResourceConfigs["StopStarted"],
+				Check: resource.ComposeAggregateTestCheckFunc(genTestCheckFuncs(
+					"paperspace_machine.test_start",
+					map[string]string{
+						"state": "off",
+					},
+				)...),
+			},
+		},
 	})
 }
 

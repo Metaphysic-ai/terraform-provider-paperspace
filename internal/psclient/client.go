@@ -75,7 +75,11 @@ func NewClient(host, authToken *string, ctx context.Context) (*Client, error) {
 
 func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	req.Header.Set("Content-Type", "application/json")
+
+	// Omit Content-Type header if the method is PATCH
+	if req.Method != http.MethodPatch {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
