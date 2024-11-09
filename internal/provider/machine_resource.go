@@ -53,7 +53,6 @@ type machineResourceModel struct {
 	RestorePointFrequency  types.String `tfsdk:"restore_point_frequency"`
 	RestorePointSnapshotID types.String `tfsdk:"restore_point_snapshot_id"`
 	PublicIPType           types.String `tfsdk:"public_ip_type"`
-	StartOnCreate          types.Bool   `tfsdk:"start_on_create"`
 	EnableNvlink           types.Bool   `tfsdk:"enable_nvlink"`
 	TakeInitialSnapshot    types.Bool   `tfsdk:"take_initial_snapshot"`
 	StartupScriptID        types.String `tfsdk:"startup_script_id"`
@@ -115,7 +114,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:            true,
 			},
 			"machine_type": schema.StringAttribute{
-				MarkdownDescription: "The machine type.",
+				MarkdownDescription: "The machine type. Updates to this field will trigger a stop/start of the machine.",
 				Required:            true,
 			},
 			"template_id": schema.StringAttribute{
@@ -126,7 +125,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"disk_size": schema.Int64Attribute{
-				MarkdownDescription: "The disk size in gigabytes.",
+				MarkdownDescription: "The disk size in gigabytes. Updates to this field will trigger a stop/start of the machine.",
 				Required:            true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(50, 100, 250, 500, 1000, 2000),
@@ -160,8 +159,13 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:            true,
 			},
 			"state": schema.StringAttribute{
-				MarkdownDescription: "State of the machine.",
+				MarkdownDescription: "Desired state of the machine. Possible values: `off`, `ready`.",
+				Optional:            true,
 				Computed:            true,
+				Default:             stringdefault.StaticString("off"),
+				Validators: []validator.String{
+					stringvalidator.OneOf([]string{"off", "ready"}...),
+				},
 			},
 			"os": schema.StringAttribute{
 				MarkdownDescription: "Operating system of the machine.",
@@ -174,7 +178,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"public_ip_type": schema.StringAttribute{
-				MarkdownDescription: "The public IP type. Possible value: `static`, `dynamic`, `none`.",
+				MarkdownDescription: "The public IP type. Possible values: `static`, `dynamic`, `none`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("dynamic"),
@@ -189,12 +193,6 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"private_ip": schema.StringAttribute{
 				MarkdownDescription: "Private IP address of the machine.",
 				Computed:            true,
-			},
-			"start_on_create": schema.BoolAttribute{
-				MarkdownDescription: "Whether to start the machine on creation.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
 			},
 			// Auto Snapshot
 			"auto_snapshot_enabled": schema.BoolAttribute{
@@ -222,6 +220,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Whether to enable auto shutdown.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"auto_shutdown_timeout": schema.Int64Attribute{
 				MarkdownDescription: "The auto shutdown timeout in hours. Must be set if `auto_shutdown_enabled` is true. " +
@@ -236,8 +235,9 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Whether to force shutdown the machine. " +
 					"May be troubles with updating the value, seems like Paperspace API issue." +
 					"Disable auto shutdown and then enable with different option to update.",
-				Optional: true,
-				Computed: true,
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			// Restore Point (only computed, user input is not implemented yet)
 			"restore_point_enabled": schema.BoolAttribute{
@@ -355,7 +355,7 @@ func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest
 		Region:                plan.Region.ValueString(),      // required
 		NetworkID:             plan.NetworkID.ValueString(),
 		PublicIPType:          plan.PublicIPType.ValueString(),
-		StartOnCreate:         getValueBoolPointer(plan.StartOnCreate),
+		StartOnCreate:         plan.State.ValueString() == "ready",
 		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
 		AutoSnapshotFrequency: plan.AutoSnapshotFrequency.ValueString(),
 		AutoSnapshotSaveCount: getValueInt64Pointer(plan.AutoSnapshotSaveCount),
@@ -451,23 +451,49 @@ func (r *machineResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 // Updates the resource and sets the updated Terraform state on success.
 func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Retrieve values from plan
-	var plan machineResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	// Fetch the entire plan and prior state
+	var plan, state machineResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	machineID := plan.ID.ValueString()
+	machineStateCurrent := state.State.ValueString()
+	machineStateTarget := plan.State.ValueString()
+
+	if (machineStateCurrent != "off") && (machineStateCurrent != "ready") {
+		resp.Diagnostics.AddError(
+			"Error updating machine",
+			fmt.Sprintf("Could not update machine, it must be 'off' or 'ready', but it is '%s'", machineStateCurrent),
+		)
+		return
+	}
+
+	// If machine type or disk size is changed, machine must be stopped before such update
+	if !plan.MachineType.Equal(state.MachineType) || !plan.DiskSize.Equal(state.DiskSize) {
+		// Make sure machine is off
+		tflog.Info(ctx, "Stopping machine before update, ID: "+machineID)
+		err := r.client.ManageMachineState(machineID, psclient.MachineStateOff)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error stopping Paperspace machine",
+				"Could not stop Paperspace machine ID "+machineID+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Generate API request body from plan
 
 	reqData := psclient.MachineUpdateConfig{
-		Name:         plan.Name.ValueString(),
-		MachineType:  plan.MachineType.ValueString(),
-		NetworkID:    plan.NetworkID.ValueString(),
-		DiskSize:     plan.DiskSize.ValueInt64(),
-		PublicIPType: plan.PublicIPType.ValueString(),
-
+		Name:                  plan.Name.ValueString(),
+		MachineType:           plan.MachineType.ValueString(),
+		NetworkID:             plan.NetworkID.ValueString(),
+		DiskSize:              plan.DiskSize.ValueInt64(),
+		PublicIPType:          plan.PublicIPType.ValueString(),
 		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
 		AutoSnapshotFrequency: plan.AutoSnapshotFrequency.ValueString(),
 		AutoSnapshotSaveCount: getValueInt64Pointer(plan.AutoSnapshotSaveCount),
@@ -479,9 +505,7 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 	jsonData, _ := json.MarshalIndent(reqData, "", " ")
 	tflog.Info(ctx, "Sending update req data: "+string(jsonData))
 
-	err := r.client.UpdateMachine(plan.ID.ValueString(), reqData)
-
-	//
+	err := r.client.UpdateMachine(machineID, reqData)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -491,12 +515,23 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	// Start/stop the machine based on target state
+	tflog.Info(ctx, fmt.Sprintf("Ensuring machine '%s' is '%s'", machineID, machineStateTarget))
+	err = r.client.ManageMachineState(machineID, machineStateTarget)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error managing Paperspace machine state",
+			"Could update state of Paperspace machine ID "+machineID+": "+err.Error(),
+		)
+		return
+	}
+
 	// Fetch updated machine
-	updatedMachine, err := r.client.GetMachine(plan.ID.ValueString())
+	updatedMachine, err := r.client.GetMachine(machineID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading updated Paperspace machine",
-			"Could not read Paperspace machine ID "+plan.ID.ValueString()+": "+err.Error(),
+			"Could not read Paperspace machine ID "+machineID+": "+err.Error(),
 		)
 		return
 	}
@@ -510,8 +545,8 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	fillStateWithMachineData(&plan, updatedMachine)
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	// Save updated data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

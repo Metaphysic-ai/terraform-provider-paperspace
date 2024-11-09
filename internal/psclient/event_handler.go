@@ -30,6 +30,19 @@ func (c *Client) GetMachineEventsStateStat() (error, map[string]int) {
 }
 
 func (c *Client) waitForEvent(eventID string) error {
+	// The "state": "error" typically indicates an issue during the execution of a specific action on the machine (like a resource update).
+	// However, if the "error" field is "null", it could mean the API did not capture any specific error details.
+	// In these cases, "state": "error" may be reporting a transient issue that did not prevent successful completion,
+	// or it may reflect a system state that was corrected automatically.
+	//
+	// The presence of a "dtFinished" timestamp suggests that the operation concluded,
+	// which is an additional hint that the operation likely completed despite the error state.
+	// This detail can help confirm that the event doesnt need further attention.
+	//
+	// Given these points, the following logic should be implemented:
+	//  - Ignore "state": "error" when "error": null and the action completed as expected without user intervention.
+	//  - Monitor for recurring "state": "error" entries, as this could indicate underlying issues even if individual operations appear to succeed.
+
 	url := fmt.Sprintf("%s/machine-events/%s", c.HostURL, eventID)
 
 	var event Event
@@ -61,11 +74,16 @@ func (c *Client) waitForEvent(eventID string) error {
 		if event.State == "done" {
 			return nil
 		}
+
 		if event.Error != nil {
 			return fmt.Errorf("error during event processing: %s", *event.Error)
 		}
 
-		// There is a case, when {"state": "error", "error": null}
+		if event.DtFinished != nil {
+			return nil
+		}
+
+		// There is a case, when {"state": "error", "error": null, "dtFinished": null}
 		if event.State == "error" {
 			return fmt.Errorf("unknown error during event %s processing", eventID)
 		}
@@ -90,8 +108,8 @@ func (c *Client) waitForMachineEvents(machineID string) error {
 	}
 
 	for _, event := range allItems {
-		// Skip 'done' events, so nothing to wait
-		if event.State == "done" {
+		// Skip 'finished' events, so nothing to wait
+		if event.DtFinished != nil {
 			continue
 		}
 

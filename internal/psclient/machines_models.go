@@ -62,7 +62,7 @@ type MachineCreateConfig struct {
 	Region                string `json:"region"`      // required
 	NetworkID             string `json:"networkId,omitempty"`
 	PublicIPType          string `json:"publicIpType,omitempty"`
-	StartOnCreate         *bool  `json:"startOnCreate,omitempty"`
+	StartOnCreate         bool   `json:"startOnCreate"`
 	AutoSnapshotEnabled   *bool  `json:"autoSnapshotEnabled,omitempty"`
 	AutoSnapshotFrequency string `json:"autoSnapshotFrequency,omitempty"`
 	AutoSnapshotSaveCount *int64 `json:"autoSnapshotSaveCount,omitempty"`

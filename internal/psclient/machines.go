@@ -10,7 +10,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+const (
+	MachineStateReady string = "ready"
+	MachineStateOff   string = "off"
+)
+
 func (c *Client) CreateMachine(machineCreateConfig MachineCreateConfig) (*Machine, error) {
+	// TODO: Handle "Get machine availability"
+	// https://docs.digitalocean.com/reference/paperspace/pspace/api-reference/#operation/machineAvailability-list
+	// Throw an error if machine is not available
+
 	rb, err := json.Marshal(machineCreateConfig)
 	if err != nil {
 		return nil, err
@@ -44,7 +53,7 @@ func (c *Client) CreateMachine(machineCreateConfig MachineCreateConfig) (*Machin
 		return nil, err
 	}
 
-	if machineCreateConfig.StartOnCreate != nil && *machineCreateConfig.StartOnCreate {
+	if machineCreateConfig.StartOnCreate {
 		// Wait for machine to start
 		tflog.Info(*c.Context, fmt.Sprintf("Waiting for machine '%s' to start", mashineResponse.Data.ID))
 
@@ -67,6 +76,7 @@ func (c *Client) CreateMachine(machineCreateConfig MachineCreateConfig) (*Machin
 }
 
 func (c *Client) UpdateMachine(machineID string, machineUpdateConfig MachineUpdateConfig) error {
+	// TODO: Check if no actual changes and skip update in such case
 	rb, err := json.Marshal(machineUpdateConfig)
 	if err != nil {
 		return err
@@ -157,6 +167,50 @@ func (c *Client) DeleteMachine(machineID string) error {
 
 	// If we reach here, the machine still exists after the wait limit
 	return fmt.Errorf("machine %s was not deleted after %f seconds", machineID, totalWaitTime.Seconds())
+}
+
+func (c *Client) ManageMachineState(machineID string, targetState string) error {
+	var action string
+
+	switch targetState {
+	case MachineStateReady:
+		action = "start"
+	case MachineStateOff:
+		action = "stop"
+	default:
+		return fmt.Errorf("invalid action: %s", targetState)
+	}
+
+	// Get current state
+	machine, err := c.GetMachine(machineID)
+	if err != nil {
+		return fmt.Errorf("failed to get machine %s: %v", machineID, err)
+	}
+
+	if machine.State == targetState {
+		tflog.Info(*c.Context, fmt.Sprintf("Machine '%s' is already '%s'", machineID, targetState))
+		return nil
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/machines/%s/%s", c.HostURL, machineID, action), nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.doRequest(req)
+	tflog.Info(*c.Context, "PATCH response body: "+string(res))
+	if err != nil {
+		return err
+	}
+
+	// Wait for action to complete
+	tflog.Info(*c.Context, fmt.Sprintf("Waiting for machine '%s' to %s", machineID, action))
+	err = c.waitForMachineState(machineID, targetState, 30*time.Minute, 10*time.Second)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Client) waitForMachineState(machineID string, desiredState string, timeout time.Duration, pollInterval time.Duration) error {

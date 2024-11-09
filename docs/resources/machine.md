@@ -28,8 +28,8 @@ resource "paperspace_machine" "example" {
 
 ### Required
 
-- `disk_size` (Number) The disk size in gigabytes.
-- `machine_type` (String) The machine type.
+- `disk_size` (Number) The disk size in gigabytes. Updates to this field will trigger a stop/start of the machine.
+- `machine_type` (String) The machine type. Updates to this field will trigger a stop/start of the machine.
 - `name` (String) The name of the new machine.
 - `region` (String) The region to create the machine in.
 - `template_id` (String) The template ID.
@@ -46,9 +46,9 @@ resource "paperspace_machine" "example" {
 - `email_password` (Boolean) Whether to email the password. Applies only on resource creation.
 - `enable_nvlink` (Boolean) Whether to enable NVLink.
 - `network_id` (String) The network ID. You can migrate machines between private networks and from the default network to a private network. It is not possible to migrate a machine back to the default network. If this is required, please file a support ticket.
-- `public_ip_type` (String) The public IP type. Possible value: `static`, `dynamic`, `none`.
-- `start_on_create` (Boolean) Whether to start the machine on creation.
+- `public_ip_type` (String) The public IP type. Possible values: `static`, `dynamic`, `none`.
 - `startup_script_id` (String) The startup script ID. Forces resource replacement if changed.
+- `state` (String) Desired state of the machine. Possible values: `off`, `ready`.
 - `take_initial_snapshot` (Boolean) Whether to take an initial snapshot. Applies only on resource creation.
 
 ### Read-Only
@@ -66,7 +66,6 @@ resource "paperspace_machine" "example" {
 - `restore_point_enabled` (Boolean) Whether to use initial snapshot as a restore point.
 - `restore_point_frequency` (String) The restore point frequency. Possible values: `shutdown`.
 - `restore_point_snapshot_id` (String) The restore point snapshot ID.
-- `state` (String) State of the machine.
 - `storage_rate` (Number) Storage rate of the machine.
 - `storage_total` (String) Storage total of the machine.
 - `storage_used` (String) Storage used of the machine.
