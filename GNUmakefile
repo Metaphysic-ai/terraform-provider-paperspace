@@ -19,6 +19,6 @@ test:
 	go test -v -cover -timeout=120s -parallel=10 ./...
 
 testacc:
-	TF_ACC=1 go test -v -cover -count=1 -parallel=5 -timeout 30m ./...
+	TF_ACC=1 go test -v -cover -count=1 -parallel=3 -timeout 45m ./internal/provider
 
 .PHONY: fmt lint test testacc build install generate

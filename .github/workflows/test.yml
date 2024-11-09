@@ -62,7 +62,8 @@ jobs:
       fail-fast: false
       matrix:
         terraform:
-          - '1.8.*'
+          # Keep single version to reduce resources usage for now.
+          # More versions may be added here
           - '1.9.*'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
