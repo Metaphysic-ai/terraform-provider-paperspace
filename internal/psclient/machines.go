@@ -76,10 +76,17 @@ func (c *Client) CreateMachine(machineCreateConfig MachineCreateConfig) (*Machin
 }
 
 func (c *Client) UpdateMachine(machineID string, machineUpdateConfig MachineUpdateConfig) error {
-	// TODO: Check if no actual changes and skip update in such case
 	rb, err := json.Marshal(machineUpdateConfig)
 	if err != nil {
 		return err
+	}
+
+	isEmpty, err := isJSONEmptyObject(string(rb))
+	if err != nil {
+		return fmt.Errorf("Invalid JSON: %v", err)
+	} else if isEmpty {
+		tflog.Info(*c.Context, "PUT request body is empty, nothing to update")
+		return nil
 	}
 
 	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/machines/%s", c.HostURL, machineID), strings.NewReader(string(rb)))
@@ -236,4 +243,13 @@ func (c *Client) waitForMachineState(machineID string, desiredState string, time
 			}
 		}
 	}
+}
+
+func isJSONEmptyObject(jsonStr string) (bool, error) {
+	var obj map[string]interface{}
+	err := json.Unmarshal([]byte(jsonStr), &obj)
+	if err != nil {
+		return false, err // Return error if JSON is invalid
+	}
+	return len(obj) == 0, nil // Check if the map is empty
 }
