@@ -45,7 +45,7 @@ resource "paperspace_machine" "example" {
 - `auto_snapshot_save_count` (Number) The number of auto snapshots to save. Must be between 1 and 9 if `auto_snapshot_enabled` is true.
 - `email_password` (Boolean) Whether to email the password. Applies only on resource creation.
 - `enable_nvlink` (Boolean) Whether to enable NVLink.
-- `network_id` (String) The network ID. You can migrate machines between private networks and from the default network to a private network. It is not possible to migrate a machine back to the default network. If this is required, please file a support ticket.
+- `private_network_id` (String) Private network ID. You can migrate machines between private networks and from the default network to a private network. It is not possible to migrate a machine back to the default network. If this is required, please file a support ticket.
 - `public_ip_type` (String) The public IP type. Possible values: `static`, `dynamic`, `none`.
 - `startup_script_id` (String) The startup script ID. Forces resource replacement if changed.
 - `state` (String) Desired state of the machine. Possible values: `off`, `ready`.

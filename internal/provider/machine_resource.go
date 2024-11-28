@@ -42,7 +42,7 @@ type machineResourceModel struct {
 	TemplateID             types.String `tfsdk:"template_id"`  // required
 	DiskSize               types.Int64  `tfsdk:"disk_size"`    // required
 	Region                 types.String `tfsdk:"region"`       // required
-	NetworkID              types.String `tfsdk:"network_id"`
+	PrivateNetworkID       types.String `tfsdk:"private_network_id"`
 	AutoSnapshotEnabled    types.Bool   `tfsdk:"auto_snapshot_enabled"`
 	AutoSnapshotFrequency  types.String `tfsdk:"auto_snapshot_frequency"`
 	AutoSnapshotSaveCount  types.Int64  `tfsdk:"auto_snapshot_save_count"`
@@ -138,12 +138,13 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"network_id": schema.StringAttribute{
-				MarkdownDescription: "The network ID. You can migrate machines between private networks and from the default network to a private network." +
+			"private_network_id": schema.StringAttribute{
+				MarkdownDescription: "Private network ID. You can migrate machines between private networks and from the default network to a private network." +
 					" It is not possible to migrate a machine back to the default network." +
 					" If this is required, please file a support ticket.",
-				Optional: true,
-				Computed: true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				// Computed: true,
 				// stringplanmodifier.UseStateForUnknown() is not used here intentionally.
 				// If private network ID is not set explicitly in Terraform configuration,
 				// the ID of default one MUST not be passed during machine update.
@@ -153,6 +154,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"region_full": schema.StringAttribute{
 				MarkdownDescription: "Full machine region name.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"cpus": schema.Int64Attribute{
 				MarkdownDescription: "Number of CPUs.",
@@ -199,6 +201,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Whether to enable auto snapshots.",
 				Optional:            true,
 				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"auto_snapshot_frequency": schema.StringAttribute{
@@ -220,6 +223,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Whether to enable auto shutdown.",
 				Optional:            true,
 				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"auto_shutdown_timeout": schema.Int64Attribute{
@@ -311,6 +315,7 @@ func (r *machineResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"dt_created": schema.StringAttribute{
 				MarkdownDescription: "Created date timestamp of the machine.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"dt_modified": schema.StringAttribute{
 				MarkdownDescription: "Modified date timestamp of the machine.",
@@ -353,7 +358,7 @@ func (r *machineResource) Create(ctx context.Context, req resource.CreateRequest
 		TemplateID:            plan.TemplateID.ValueString(),  // required
 		DiskSize:              plan.DiskSize.ValueInt64(),     // required
 		Region:                plan.Region.ValueString(),      // required
-		NetworkID:             plan.NetworkID.ValueString(),
+		NetworkID:             plan.PrivateNetworkID.ValueString(),
 		PublicIPType:          plan.PublicIPType.ValueString(),
 		StartOnCreate:         plan.State.ValueString() == "ready",
 		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
@@ -502,8 +507,8 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 		reqData.MachineType = plan.MachineType.ValueString()
 	}
 
-	if !plan.NetworkID.Equal(state.NetworkID) {
-		reqData.NetworkID = plan.NetworkID.ValueString()
+	if !plan.PrivateNetworkID.Equal(state.PrivateNetworkID) {
+		reqData.NetworkID = plan.PrivateNetworkID.ValueString()
 	}
 
 	if !plan.DiskSize.Equal(state.DiskSize) {
@@ -636,7 +641,11 @@ func fillStateWithMachineData(state *machineResourceModel, machine *psclient.Mac
 	state.StorageUsed = types.StringValue(machine.StorageUsed)
 	state.RegionFull = types.StringValue(machine.RegionFull)
 	state.PrivateIP = types.StringValue(machine.PrivateIP)
-	state.NetworkID = types.StringValue(machine.NetworkID)
+
+	if machine.IsPrivateNetwork {
+		state.PrivateNetworkID = types.StringValue(machine.NetworkID)
+	}
+
 	state.PublicIP = types.StringPointerValue(machine.PublicIP) // Nullable field
 	state.PublicIPType = types.StringValue(machine.PublicIPType)
 	state.AutoShutdownEnabled = types.BoolValue(machine.AutoShutdownEnabled)

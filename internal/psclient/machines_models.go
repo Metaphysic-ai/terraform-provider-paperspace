@@ -34,7 +34,8 @@ type Machine struct {
 	RegionFull             string        `json:"region"`
 	PrivateIP              string        `json:"privateIp"`
 	NetworkID              string        `json:"networkId"`
-	PublicIP               *string       `json:"publicIp"` // Nullable field
+	IsPrivateNetwork       bool          `json:"isPrivateNetwork"` // custom
+	PublicIP               *string       `json:"publicIp"`         // Nullable field
 	PublicIPType           string        `json:"publicIpType"`
 	AutoShutdownEnabled    bool          `json:"autoShutdownEnabled"`
 	AutoShutdownTimeout    *int64        `json:"autoShutdownTimeout"` // Nullable field

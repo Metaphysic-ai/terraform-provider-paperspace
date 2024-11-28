@@ -135,6 +135,12 @@ func (c *Client) GetMachine(machineID string) (*Machine, error) {
 		return nil, err
 	}
 
+	privateNetwork, err := c.GetPrivateNetwork(machine.NetworkID)
+	if err != nil {
+		return nil, fmt.Errorf("Could not check network with id %s: %v", machine.NetworkID, err)
+	}
+	machine.IsPrivateNetwork = privateNetwork != nil
+
 	return &machine, nil
 }
 
