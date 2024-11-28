@@ -489,17 +489,41 @@ func (r *machineResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Generate API request body from plan
 
 	reqData := psclient.MachineUpdateConfig{
-		Name:                  plan.Name.ValueString(),
-		MachineType:           plan.MachineType.ValueString(),
-		NetworkID:             plan.NetworkID.ValueString(),
-		DiskSize:              plan.DiskSize.ValueInt64(),
-		PublicIPType:          plan.PublicIPType.ValueString(),
-		AutoSnapshotEnabled:   getValueBoolPointer(plan.AutoSnapshotEnabled),
 		AutoSnapshotFrequency: plan.AutoSnapshotFrequency.ValueString(),
 		AutoSnapshotSaveCount: getValueInt64Pointer(plan.AutoSnapshotSaveCount),
-		AutoShutdownEnabled:   getValueBoolPointer(plan.AutoShutdownEnabled),
 		AutoShutdownTimeout:   getValueInt64Pointer(plan.AutoShutdownTimeout),
-		AutoShutdownForce:     getValueBoolPointer(plan.AutoShutdownForce),
+	}
+
+	if !plan.Name.Equal(state.Name) {
+		reqData.Name = plan.Name.ValueString()
+	}
+
+	if !plan.MachineType.Equal(state.MachineType) {
+		reqData.MachineType = plan.MachineType.ValueString()
+	}
+
+	if !plan.NetworkID.Equal(state.NetworkID) {
+		reqData.NetworkID = plan.NetworkID.ValueString()
+	}
+
+	if !plan.DiskSize.Equal(state.DiskSize) {
+		reqData.DiskSize = plan.DiskSize.ValueInt64()
+	}
+
+	if !plan.PublicIPType.Equal(state.PublicIPType) {
+		reqData.PublicIPType = plan.PublicIPType.ValueString()
+	}
+
+	if !plan.AutoSnapshotEnabled.Equal(state.AutoSnapshotEnabled) {
+		reqData.AutoSnapshotEnabled = getValueBoolPointer(plan.AutoSnapshotEnabled)
+	}
+
+	if !plan.AutoShutdownEnabled.Equal(state.AutoShutdownEnabled) {
+		reqData.AutoShutdownEnabled = getValueBoolPointer(plan.AutoShutdownEnabled)
+	}
+
+	if !plan.AutoShutdownForce.Equal(state.AutoShutdownForce) {
+		reqData.AutoShutdownForce = getValueBoolPointer(plan.AutoShutdownForce)
 	}
 
 	jsonData, _ := json.MarshalIndent(reqData, "", " ")
