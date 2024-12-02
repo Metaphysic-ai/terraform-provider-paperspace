@@ -48,6 +48,6 @@ func sortCustomTemplates(templates []CustomTemplate, sortBy string) error {
 		})
 		return nil
 	default:
-		return fmt.Errorf("Invalid sort option: %s", sortBy)
+		return fmt.Errorf("invalid sort option: %s", sortBy)
 	}
 }

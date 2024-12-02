@@ -83,7 +83,7 @@ func (c *Client) UpdateMachine(machineID string, machineUpdateConfig MachineUpda
 
 	isEmpty, err := isJSONEmptyObject(string(rb))
 	if err != nil {
-		return fmt.Errorf("Invalid JSON: %v", err)
+		return fmt.Errorf("invalid JSON: %v", err)
 	} else if isEmpty {
 		tflog.Info(*c.Context, "PUT request body is empty, nothing to update")
 		return nil
@@ -137,7 +137,7 @@ func (c *Client) GetMachine(machineID string) (*Machine, error) {
 
 	privateNetwork, err := c.GetPrivateNetwork(machine.NetworkID)
 	if err != nil {
-		return nil, fmt.Errorf("Could not check network with id %s: %v", machine.NetworkID, err)
+		return nil, fmt.Errorf("could not check network with id %s: %v", machine.NetworkID, err)
 	}
 	machine.IsPrivateNetwork = privateNetwork != nil
 

@@ -130,6 +130,7 @@ func (p *paperspaceProvider) Configure(ctx context.Context, req provider.Configu
 func (p *paperspaceProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewMachineResource,
+		NewStartupScriptResource,
 	}
 }
 
