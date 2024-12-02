@@ -10,14 +10,14 @@ import (
 )
 
 // Returns number of each found machine event type (name).
-func (c *Client) GetMachineEventsStateStat() (error, map[string]int) {
+func (c *Client) GetMachineEventsStateStat() (map[string]int, error) {
 	allItems := []Event{}
 	stat := map[string]int{}
 	params := map[string]string{}
 
 	err := fetchAllItems(c, &allItems, "machine-events", params)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	for _, event := range allItems {
@@ -26,7 +26,7 @@ func (c *Client) GetMachineEventsStateStat() (error, map[string]int) {
 
 	stat["_totalEventsProcessed"] = len(allItems)
 
-	return nil, stat
+	return stat, nil
 }
 
 func (c *Client) waitForEvent(eventID string) error {

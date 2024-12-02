@@ -39,7 +39,7 @@ func (c *Client) GetAuthSession() (*AuthSession, error) {
 	}
 
 	if authSession.User.ID == "" {
-		return nil, errors.New("Unable to get auth session, possibly invalid token")
+		return nil, errors.New("unable to get auth session, possibly invalid token")
 	}
 
 	return authSession, nil
